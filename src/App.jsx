@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -46,7 +46,7 @@ const RedirectToDashboard = () => {
 
 function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
           <Routes>
@@ -102,7 +102,7 @@ function App() {
           </Routes>
         </NotificationProvider>
       </AuthProvider>
-    </Router>
+    </BrowserRouter>
   );
 }
 
