@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -34,7 +34,7 @@ import RateDoctor from './pages/PatientDashboard/RateDoctor';
 import UpdateAppointment from './pages/PatientDashboard/UpdateAppointment';
 
 // Profile page (common for all roles)
-import Profile from './pages/Profile';  // ✅ Correct import (capital P)
+import Profile from './pages/Profile';
 
 const RedirectToDashboard = () => {
   const { user } = useAuth();
@@ -46,14 +46,15 @@ const RedirectToDashboard = () => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <AuthProvider>
         <NotificationProvider>
           <Routes>
+            {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* Admin routes */}
+            {/* Admin Routes */}
             <Route element={<PrivateRoute allowedRoles={['admin']} />}>
               <Route path="/admin" element={<Layout />}>
                 <Route index element={<AdminDashboard />} />
@@ -64,7 +65,7 @@ function App() {
               </Route>
             </Route>
 
-            {/* Doctor routes */}
+            {/* Doctor Routes */}
             <Route element={<PrivateRoute allowedRoles={['doctor']} />}>
               <Route path="/doctor" element={<Layout />}>
                 <Route index element={<DoctorDashboard />} />
@@ -79,7 +80,7 @@ function App() {
               </Route>
             </Route>
 
-            {/* Patient routes */}
+            {/* Patient Routes */}
             <Route element={<PrivateRoute allowedRoles={['patient']} />}>
               <Route path="/patient" element={<Layout />}>
                 <Route index element={<PatientDashboard />} />
@@ -96,11 +97,12 @@ function App() {
               </Route>
             </Route>
 
+            {/* Catch-all: Redirect unknown routes to dashboard */}
             <Route path="*" element={<RedirectToDashboard />} />
           </Routes>
         </NotificationProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </Router>
   );
 }
 
