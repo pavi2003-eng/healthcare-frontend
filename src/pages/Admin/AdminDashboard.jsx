@@ -16,7 +16,7 @@ import {
   FaSyringe,
   FaTrash,
   FaSpinner
-} from 'react-icons/fa';  // Fixed import
+} from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import Swal from 'sweetalert2';
 
@@ -70,19 +70,6 @@ const AdminDashboard = () => {
   };
 
   const handleCleanup = async () => {
-    // Check if user is admin
-    const userFromStorage = JSON.parse(localStorage.getItem('user') || '{}');
-    if (userFromStorage?.role !== 'admin' && user?.role !== 'admin') {
-      Swal.fire({
-        title: 'Access Denied',
-        text: 'Only administrators can perform this action.',
-        icon: 'error',
-        timer: 3000,
-        showConfirmButton: true
-      });
-      return;
-    }
-
     const result = await Swal.fire({
       title: '⚠️ DANGER ZONE ⚠️',
       html: `
@@ -403,8 +390,8 @@ const AdminDashboard = () => {
               />
             </div>
             
-            {/* Cleanup Button - Only visible to admins */}
-            {(user?.role === 'admin' || JSON.parse(localStorage.getItem('user') || '{}')?.role === 'admin') && (
+            {/* Cleanup Button - Showing for ALL users (temporary) */}
+            {true && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
