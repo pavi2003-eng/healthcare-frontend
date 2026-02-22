@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import API from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
-import { FaComments } from 'react-icons/fa';
+import { FaComments, FaUser, FaClock, FaArrowRight } from 'react-icons/fa';
 
 const DoctorChats = () => {
   const [chats, setChats] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -16,6 +17,8 @@ const DoctorChats = () => {
         setChats(res.data);
       } catch (error) {
         console.error('Error fetching chats:', error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchChats();
@@ -26,81 +29,140 @@ const DoctorChats = () => {
     return profilePicture ? `https://healthcare-backend-kj7h.onrender.com${profilePicture}` : null;
   };
 
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: 'short' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading chats...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    // Offset parent layout padding (p-6) and use full height flex column
-    <div className="h-full flex flex-col -m-6">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 to-white">
       {/* Fixed Header */}
-      <div className="bg-white/80 backdrop-blur-sm shadow-md p-6 border-b border-blue-100 flex-shrink-0">
-        <h2 className="text-3xl font-bold text-blue-600 flex items-center gap-2">
-          <FaComments className="text-blue-500" /> My Chats
-        </h2>
+      <div className="bg-white shadow-md border-b border-blue-100 flex-shrink-0">
+        <div className="px-4 sm:px-6 py-4">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-600 flex items-center gap-2">
+            <FaComments className="text-blue-500" /> 
+            <span>My Chats</span>
+            {chats.length > 0 && (
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                ({chats.length} {chats.length === 1 ? 'chat' : 'chats'})
+              </span>
+            )}
+          </h2>
+        </div>
       </div>
 
       {/* Scrollable List */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-3">
-          {chats.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">No chats yet.</p>
-          ) : (
-            chats.map((chat, index) => (
-              <motion.div
-                key={chat._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={{ scale: 1.02, x: 5 }}
-              >
-                <Link
-                  to={`/doctor/chats/${chat._id}`}
-                  className="block bg-white/80 backdrop-blur-sm rounded-2xl shadow-md hover:shadow-xl transition-all p-4 border border-blue-100"
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        {chats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="bg-blue-50 rounded-full p-6 mb-4">
+              <FaComments className="text-5xl text-blue-300" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">No chats yet</h3>
+            <p className="text-sm text-gray-500 max-w-xs">
+              When you have conversations with patients, they will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-w-4xl mx-auto">
+            {chats.map((chat, index) => {
+              const lastMessage = chat.messages?.[chat.messages.length - 1];
+              const lastMessageTime = lastMessage?.timestamp || chat.lastUpdated;
+              
+              return (
+                <motion.div
+                  key={chat._id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.01 }}
+                  className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all border border-blue-100 overflow-hidden"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Patient Avatar */}
-                    <div className="relative">
-                      {chat.patientProfilePicture ? (
-                        <img
-                          src={getImageUrl(chat.patientProfilePicture)}
-                          alt={chat.patientName}
-                          className="w-14 h-14 rounded-full object-cover border-2 border-blue-200"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.style.display = 'none';
-                            e.target.parentNode.innerHTML += `<div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">${getInitial(chat.patientName)}</div>`;
-                          }}
-                        />
-                      ) : (
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">
-                          {getInitial(chat.patientName)}
-                        </div>
-                      )}
-                      {chat.unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center shadow">
-                          {chat.unreadCount}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Chat Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-semibold text-gray-800 truncate">
-                          {chat.patientName}
-                        </h3>
-                        <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                          {new Date(chat.lastUpdated).toLocaleDateString()}
-                        </span>
+                  <Link
+                    to={`/doctor/chats/${chat._id}`}
+                    className="block p-4"
+                  >
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      {/* Patient Avatar */}
+                      <div className="relative flex-shrink-0">
+                        {chat.patientProfilePicture ? (
+                          <img
+                            src={getImageUrl(chat.patientProfilePicture)}
+                            alt={chat.patientName}
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-blue-200"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                              e.target.parentNode.innerHTML += `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-lg sm:text-xl font-bold shadow-lg">${getInitial(chat.patientName)}</div>`;
+                            }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-lg sm:text-xl font-bold shadow-lg">
+                            {getInitial(chat.patientName)}
+                          </div>
+                        )}
+                        {chat.unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse">
+                            {chat.unreadCount}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-600 mt-1 truncate">
-                        {chat.messages?.[chat.messages.length - 1]?.text || 'No messages yet'}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1 truncate">{chat.subject}</p>
+
+                      {/* Chat Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2">
+                          <h3 className="font-semibold text-gray-800 text-base sm:text-lg truncate">
+                            {chat.patientName}
+                          </h3>
+                          <span className="text-xs text-gray-400 flex items-center gap-1 whitespace-nowrap">
+                            {formatTime(lastMessageTime)}
+                          </span>
+                        </div>
+                        
+                        <p className="text-sm text-gray-600 mt-1 truncate max-w-md">
+                          {lastMessage?.text || 'No messages yet'}
+                        </p>
+                        
+                        {chat.subject && (
+                          <p className="text-xs text-blue-600 mt-1 bg-blue-50 inline-block px-2 py-0.5 rounded-full">
+                            {chat.subject}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Arrow indicator - hidden on mobile, shown on desktop */}
+                      <div className="hidden sm:block text-gray-400">
+                        <FaArrowRight />
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))
-          )}
-        </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

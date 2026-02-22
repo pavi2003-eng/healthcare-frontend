@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -21,7 +21,6 @@ import PatientDetail from './pages/DoctorDashboard/PatientDetail';
 import DoctorChats from './pages/DoctorDashboard/Chats';
 import DoctorViewChat from './pages/DoctorDashboard/ViewChat';
 import BookAppointmentDoc from './pages/DoctorDashboard/BookAppointmentDoc';
-import DepartmentList from './pages/DoctorDashboard/DepartmentList';
 
 // Patient pages
 import PatientDashboard from './pages/PatientDashboard/PatientDashboard';
@@ -36,12 +35,85 @@ import UpdateAppointment from './pages/PatientDashboard/UpdateAppointment';
 // Profile page (common for all roles)
 import Profile from './pages/Profile';
 
+// Enhanced ScrollToTop component with multiple strategies
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Strategy 1: Immediate scroll
+    window.scrollTo(0, 0);
+    
+    // Strategy 2: Scroll after a tiny delay (for when DOM needs time to render)
+    const timeoutId = setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto' // Use 'auto' instead of 'smooth' for instant scroll
+      });
+    }, 50);
+
+    // Strategy 3: Force scroll on the main content area if it exists
+    const mainContent = document.querySelector('main');
+    if (mainContent) {
+      mainContent.scrollTop = 0;
+    }
+
+    // Strategy 4: Try to scroll any scrollable containers
+    const scrollableElements = document.querySelectorAll('.overflow-auto, .overflow-y-auto');
+    scrollableElements.forEach(element => {
+      element.scrollTop = 0;
+    });
+
+    return () => clearTimeout(timeoutId);
+  }, [pathname]);
+
+  return null;
+};
+
+// Alternative: If you're using React 18 with Concurrent Features
+const ScrollToTopWithRequestAnimationFrame = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Use requestAnimationFrame for better timing
+    const rafId = requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      
+      // Also scroll any main content areas
+      const mainContent = document.querySelector('main');
+      if (mainContent) {
+        mainContent.scrollTop = 0;
+      }
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [pathname]);
+
+  return null;
+};
+
+// Redirect based on user role
 const RedirectToDashboard = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'admin') return <Navigate to="/admin" replace />;
-  if (user.role === 'doctor') return <Navigate to="/doctor" replace />;
-  return <Navigate to="/patient" replace />;
+  
+  if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+  if (user.role === 'doctor') return <Navigate to="/doctor/dashboard" replace />;
+  if (user.role === 'patient') return <Navigate to="/patient/dashboard" replace />;
+  
+  return <Navigate to="/login" replace />;
 };
 
 function App() {
@@ -49,6 +121,12 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
+          {/* Use the enhanced ScrollToTop component */}
+          <ScrollToTop />
+          
+          {/* Alternative: If still having issues, uncomment below and comment above */}
+          {/* <ScrollToTopWithRequestAnimationFrame /> */}
+
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
@@ -57,7 +135,7 @@ function App() {
             {/* Admin Routes */}
             <Route element={<PrivateRoute allowedRoles={['admin']} />}>
               <Route path="/admin" element={<Layout />}>
-                <Route index element={<AdminDashboard />} />
+                <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="doctors" element={<ManageDoctors />} />
                 <Route path="patients" element={<ManagePatients />} />
@@ -68,14 +146,13 @@ function App() {
             {/* Doctor Routes */}
             <Route element={<PrivateRoute allowedRoles={['doctor']} />}>
               <Route path="/doctor" element={<Layout />}>
-                <Route index element={<DoctorDashboard />} />
+                <Route index element={<Navigate to="/doctor/dashboard" replace />} />
                 <Route path="dashboard" element={<DoctorDashboard />} />
                 <Route path="appointments" element={<AppointmentList />} />
                 <Route path="patients/:patientId" element={<PatientDetail />} />
                 <Route path="chats" element={<DoctorChats />} />
                 <Route path="chats/:chatId" element={<DoctorViewChat />} />
                 <Route path="book-appointment" element={<BookAppointmentDoc />} />
-                <Route path="departments" element={<DepartmentList />} />
                 <Route path="profile" element={<Profile />} />
               </Route>
             </Route>
@@ -83,7 +160,7 @@ function App() {
             {/* Patient Routes */}
             <Route element={<PrivateRoute allowedRoles={['patient']} />}>
               <Route path="/patient" element={<Layout />}>
-                <Route index element={<PatientDashboard />} />
+                <Route index element={<Navigate to="/patient/dashboard" replace />} />
                 <Route path="dashboard" element={<PatientDashboard />} />
                 <Route path="doctors" element={<PatientDoctorList />} />
                 <Route path="book-appointment" element={<PatientBookAppointment />} />
@@ -92,7 +169,6 @@ function App() {
                 <Route path="chats/:chatId" element={<PatientViewChat />} />
                 <Route path="rate-doctor/:doctorId" element={<RateDoctor />} />
                 <Route path="update-appointment/:id" element={<UpdateAppointment />} />
-                <Route path="departments" element={<DepartmentList />} />
                 <Route path="profile" element={<Profile />} />
               </Route>
             </Route>

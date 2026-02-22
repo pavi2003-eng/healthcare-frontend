@@ -5,3 +5,19 @@
 body {
   font-family: 'Poppins', sans-serif;
 }
+/* Force scroll to top on route change */
+html, body {
+  scroll-behavior: auto !important;
+}
+
+/* Ensure main content starts at top */
+main {
+  scroll-behavior: auto !important;
+  overflow-anchor: none;
+}
+
+/* Prevent scroll restoration */
+* {
+  scroll-margin-top: 0;
+  scroll-padding-top: 0;
+}
