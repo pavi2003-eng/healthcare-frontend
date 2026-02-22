@@ -11,21 +11,24 @@ import {
   FaCalendarCheck,
   FaHeartbeat,
   FaExclamationTriangle,
-  FaCalendarAlt,
   FaChartLine,
   FaStethoscope,
   FaSyringe,
-  FaPills,
-  FaClinicMedical
+  FaTrash,
+  FaSpinner
 } from 'react-icons/fa';  // Fixed import
+import { useAuth } from '../../context/AuthContext';
+import Swal from 'sweetalert2';
 
 const AdminDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cleaning, setCleaning] = useState(false);
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [endDate, setEndDate] = useState(new Date());
   const [isMobile, setIsMobile] = useState(false);
   const [chartKey, setChartKey] = useState(0);
+  const { user } = useAuth();
 
   useEffect(() => {
     const checkMobile = () => {
@@ -63,6 +66,90 @@ const AdminDashboard = () => {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCleanup = async () => {
+    // Check if user is admin
+    const userFromStorage = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userFromStorage?.role !== 'admin' && user?.role !== 'admin') {
+      Swal.fire({
+        title: 'Access Denied',
+        text: 'Only administrators can perform this action.',
+        icon: 'error',
+        timer: 3000,
+        showConfirmButton: true
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: '⚠️ DANGER ZONE ⚠️',
+      html: `
+        <div class="text-left">
+          <p class="mb-3 font-bold text-red-600">This will PERMANENTLY DELETE:</p>
+          <ul class="list-disc pl-5 mb-3 text-sm">
+            <li>✓ All patients</li>
+            <li>✓ All doctors</li>
+            <li>✓ All appointments</li>
+            <li>✓ All chats</li>
+            <li>✓ All ratings</li>
+            <li>✓ All non-admin users</li>
+          </ul>
+          <p class="text-sm text-gray-600">Admin accounts will be preserved.</p>
+          <p class="text-xs text-red-500 mt-2">This action CANNOT be undone!</p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete everything!',
+      cancelButtonText: 'Cancel',
+      background: isMobile ? '#fff' : undefined,
+      width: isMobile ? '90%' : '32rem',
+      reverseButtons: true
+    });
+
+    if (!result.isConfirmed) return;
+
+    setCleaning(true);
+    try {
+      // Call the cleanup API
+      const response = await API.get('/admin/nuke-all-data');
+      
+      Swal.fire({
+        title: '✅ Cleanup Complete',
+        html: `
+          <div class="text-left">
+            <p class="mb-2">Successfully deleted:</p>
+            <ul class="list-disc pl-5 text-sm">
+              <li>${response.data.stats?.ratingsDeleted || 0} ratings</li>
+              <li>${response.data.stats?.chatsDeleted || 0} chats</li>
+              <li>${response.data.stats?.appointmentsDeleted || 0} appointments</li>
+              <li>${response.data.stats?.patientsDeleted || 0} patients</li>
+              <li>${response.data.stats?.doctorsDeleted || 0} doctors</li>
+              <li>${response.data.stats?.nonAdminUsersDeleted || 0} non-admin users</li>
+            </ul>
+            <p class="mt-2 font-bold text-green-600">${response.data.adminUsersRemaining || 0} admin accounts preserved</p>
+          </div>
+        `,
+        icon: 'success',
+        timer: 5000,
+        timerProgressBar: true
+      });
+      
+      // Refresh dashboard data
+      fetchData();
+    } catch (error) {
+      console.error('Cleanup failed:', error);
+      Swal.fire({
+        title: 'Error',
+        text: error.response?.data?.message || 'Cleanup failed. Please try again.',
+        icon: 'error'
+      });
+    } finally {
+      setCleaning(false);
     }
   };
 
@@ -288,31 +375,56 @@ const AdminDashboard = () => {
       )}
 
       <div className="relative z-10 max-w-7xl mx-auto">
-        {/* Header with date filter */}
+        {/* Header with date filter and cleanup button */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-blue-100">
           <h2 className="text-2xl sm:text-3xl font-bold text-blue-800 flex items-center gap-2 mb-3 sm:mb-0">
             <FaChartLine className="text-blue-500" /> Analytics Dashboard
           </h2>
-          <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-blue-100">
-            <DatePicker
-              selected={startDate}
-              onChange={(date) => setStartDate(date)}
-              selectsStart
-              startDate={startDate}
-              endDate={endDate}
-              className="border border-blue-200 rounded-lg px-3 py-1.5 text-sm w-28 sm:w-32"
-              dateFormat="MMM d, yyyy"
-            />
-            <DatePicker
-              selected={endDate}
-              onChange={(date) => setEndDate(date)}
-              selectsEnd
-              startDate={startDate}
-              endDate={endDate}
-              minDate={startDate}
-              className="border border-blue-200 rounded-lg px-3 py-1.5 text-sm w-28 sm:w-32"
-              dateFormat="MMM d, yyyy"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-blue-100">
+              <DatePicker
+                selected={startDate}
+                onChange={(date) => setStartDate(date)}
+                selectsStart
+                startDate={startDate}
+                endDate={endDate}
+                className="border border-blue-200 rounded-lg px-3 py-1.5 text-sm w-28 sm:w-32"
+                dateFormat="MMM d, yyyy"
+              />
+              <DatePicker
+                selected={endDate}
+                onChange={(date) => setEndDate(date)}
+                selectsEnd
+                startDate={startDate}
+                endDate={endDate}
+                minDate={startDate}
+                className="border border-blue-200 rounded-lg px-3 py-1.5 text-sm w-28 sm:w-32"
+                dateFormat="MMM d, yyyy"
+              />
+            </div>
+            
+            {/* Cleanup Button - Only visible to admins */}
+            {(user?.role === 'admin' || JSON.parse(localStorage.getItem('user') || '{}')?.role === 'admin') && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleCleanup}
+                disabled={cleaning}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {cleaning ? (
+                  <>
+                    <FaSpinner className="animate-spin" />
+                    Cleaning...
+                  </>
+                ) : (
+                  <>
+                    <FaTrash />
+                    Clear All Data
+                  </>
+                )}
+              </motion.button>
+            )}
           </div>
         </div>
 
