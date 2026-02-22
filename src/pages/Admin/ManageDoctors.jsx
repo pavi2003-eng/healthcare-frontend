@@ -405,7 +405,7 @@ const ManageDoctors = () => {
                 </div>
 
                 {/* Password */}
-                {/* <div className="relative">
+                <div className="relative">
                   <FaLock className="absolute left-3 top-3 text-blue-400 text-sm sm:text-base" />
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -422,7 +422,7 @@ const ManageDoctors = () => {
                   >
                     {showPassword ? <FaEyeSlash size={isMobile ? 16 : 18} /> : <FaEye size={isMobile ? 16 : 18} />}
                   </span>
-                </div> */}
+                </div>
 
                 {/* Gender */}
                 <div className="relative">
