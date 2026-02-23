@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import API from '../../api';
 import { useAuth } from '../../context/AuthContext';
@@ -19,42 +19,39 @@ const DoctorViewChat = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
 
-  const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const lastMessageRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const isAtBottomRef = useRef(true);
+  const typingTimeoutRef = useRef(null);
 
-  // Check mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+  // Scroll to bottom function
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior
+      });
+    }
   }, []);
 
-  const scrollToBottom = (behavior = 'smooth') => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
-    }
-  };
-
-  const checkIfAtBottom = () => {
+  // Check if at bottom
+  const checkIfAtBottom = useCallback(() => {
     if (!messagesContainerRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-    const bottomThreshold = 100;
-    return scrollHeight - scrollTop - clientHeight < bottomThreshold;
-  };
+    return scrollHeight - scrollTop - clientHeight < 50;
+  }, []);
 
-  const handleScroll = () => {
+  // Handle scroll
+  const handleScroll = useCallback(() => {
     const atBottom = checkIfAtBottom();
-    setIsAtBottom(atBottom);
+    isAtBottomRef.current = atBottom;
     setShowScrollButton(!atBottom);
-  };
+  }, [checkIfAtBottom]);
 
+  // Fetch chat
   useEffect(() => {
     const fetchChat = async () => {
       try {
@@ -62,10 +59,10 @@ const DoctorViewChat = () => {
         setChat(res.data);
         await API.patch(`/chats/${chatId}/read`);
         
-        // Scroll to bottom on initial load with a delay to ensure DOM is ready
         setTimeout(() => {
           scrollToBottom('auto');
-        }, 200);
+          isAtBottomRef.current = true;
+        }, 100);
       } catch (error) {
         console.error('Error fetching chat:', error);
       } finally {
@@ -73,19 +70,16 @@ const DoctorViewChat = () => {
       }
     };
     fetchChat();
-  }, [chatId]);
+  }, [chatId, scrollToBottom]);
 
   // Handle new messages
   useEffect(() => {
     if (!chat?.messages?.length) return;
     
-    // Only auto-scroll if user was at bottom before new message
-    if (isAtBottom) {
-      setTimeout(() => {
-        scrollToBottom('smooth');
-      }, 100);
+    if (isAtBottomRef.current) {
+      scrollToBottom('smooth');
     }
-  }, [chat?.messages]);
+  }, [chat?.messages, scrollToBottom]);
 
   const handleSend = async () => {
     if (!newMessage.trim()) return;
@@ -98,10 +92,9 @@ const DoctorViewChat = () => {
       setChat(res.data.chat);
       setNewMessage('');
       
-      // Always scroll to bottom after sending own message
       setTimeout(() => {
         scrollToBottom('smooth');
-        setIsAtBottom(true);
+        isAtBottomRef.current = true;
         setShowScrollButton(false);
       }, 100);
     } catch (error) {
@@ -116,40 +109,70 @@ const DoctorViewChat = () => {
     }
   };
 
-  const getInitial = (name) => name?.charAt(0).toUpperCase() || '?';
-  const getImageUrl = (profilePicture) => {
-    return profilePicture ? `https://healthcare-backend-kj7h.onrender.com${profilePicture}` : null;
+  const handleTyping = (e) => {
+    setNewMessage(e.target.value);
+    
+    // Show typing indicator
+    setIsTyping(true);
+    
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Hide typing indicator after 1 second of no typing
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+    }, 1000);
   };
 
+  const getInitial = (name) => name?.charAt(0).toUpperCase() || '?';
+
   const formatMessageTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!timestamp) return '';
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
   };
 
   const formatDate = (timestamp) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    if (!timestamp) return '';
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return '';
+      
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString([], {
-        month: 'short',
-        day: 'numeric',
-        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-      });
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString([], {
+          month: 'short',
+          day: 'numeric',
+          year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+        });
+      }
+    } catch {
+      return '';
     }
+  };
+
+  // Check if message is read
+  const isMessageRead = (msg) => {
+    return msg.read === true;
   };
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading conversation...</p>
@@ -160,12 +183,12 @@ const DoctorViewChat = () => {
 
   if (!chat) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
         <div className="text-center">
           <p className="text-gray-600 mb-4">Chat not found</p>
           <button
             onClick={() => navigate('/doctor/chats')}
-            className="text-blue-600 hover:text-blue-700"
+            className="text-blue-500 hover:text-blue-600"
           >
             Back to Chats
           </button>
@@ -175,102 +198,92 @@ const DoctorViewChat = () => {
   }
 
   // Group messages by date
-  const groupedMessages = chat.messages.reduce((groups, message) => {
-    const date = formatDate(message.timestamp);
+  const groupedMessages = chat.messages?.reduce((groups, message) => {
+    if (!message?.createdAt) return groups;
+    
+    const date = formatDate(message.createdAt);
     if (!groups[date]) {
       groups[date] = [];
     }
     groups[date].push(message);
     return groups;
-  }, {});
+  }, {}) || {};
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 to-white -m-3 sm:-m-4 md:-m-6" style={{
-      position: "absolute",
-      width: "100%",
-    }}>
-      {/* Fixed Header */}
-      <div className="bg-white shadow-md border-b border-blue-200 flex-shrink-0 sticky top-0 z-20">
-        <div className="flex items-center px-3 sm:px-4 py-2 sm:py-3">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+    <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 to-white">
+      {/* Header - Matching DoctorChats light blue theme */}
+      <div className="bg-blue-50 text-blue-800 shadow-sm flex-shrink-0 sticky top-0 z-20 border-b border-blue-200">
+        <div className="flex items-center px-4 py-2">
+          <button
             onClick={() => navigate(-1)}
-            className="text-gray-600 hover:text-blue-600 p-2 hover:bg-blue-50 rounded-full transition mr-2"
+            className="text-blue-500 hover:bg-blue-100 p-2 rounded-full transition mr-2"
             aria-label="Go back"
           >
-            <FaArrowLeft size={isMobile ? 18 : 20} />
-          </motion.button>
+            <FaArrowLeft size={20} />
+          </button>
 
           <div className="flex-shrink-0 mr-3">
-            {chat.patientProfilePicture ? (
-              <img
-                src={getImageUrl(chat.patientProfilePicture)}
-                alt={chat.patientName}
-                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-blue-300"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.style.display = 'none';
-                  e.target.parentNode.innerHTML += `<div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-sm font-bold">${getInitial(chat.patientName)}</div>`;
-                }}
-              />
-            ) : (
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-sm font-bold">
-                {getInitial(chat.patientName)}
-              </div>
-            )}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-lg font-bold shadow-sm">
+              {getInitial(chat.patientName)}
+            </div>
           </div>
 
-          <h2 className="font-semibold text-gray-800 text-base sm:text-lg truncate">
-            {chat.patientName}
-          </h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-blue-800 text-base sm:text-lg truncate">
+              {chat.patientName}
+            </h2>
+          </div>
         </div>
       </div>
 
-      {/* Messages Area */}
+      {/* Messages Area - Sky blue background */}
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto pb-20" // Added padding bottom to prevent last message from hiding
+        className="flex-1 overflow-y-auto bg-gradient-to-br from-blue-50 to-white"
+        style={{ scrollBehavior: 'smooth' }}
       >
-        <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4">
+        <div className="px-4 py-4 pb-24 max-w-4xl mx-auto">
           {Object.entries(groupedMessages).map(([date, messages]) => (
             <div key={date} className="mb-6">
-              <div className="flex justify-center mb-4">
-                <span className="bg-gray-200 text-gray-600 text-xs px-4 py-1.5 rounded-full font-medium">
-                  {date}
-                </span>
-              </div>
+              {date && (
+                <div className="flex justify-center mb-4">
+                  <span className="bg-white/90 backdrop-blur-sm text-blue-600 text-xs px-4 py-1.5 rounded-full font-medium shadow-sm border border-blue-200">
+                    {date}
+                  </span>
+                </div>
+              )}
 
               {messages.map((msg, idx) => {
-                const isOwn = msg.sender === user.name;
-                const isLastMessage = idx === messages.length - 1 && 
-                                     date === Object.keys(groupedMessages).pop();
+                const isOwn = msg.senderName === user.name;
+                const isRead = isMessageRead(msg);
                 
                 return (
                   <motion.div
-                    key={idx}
-                    ref={isLastMessage ? lastMessageRef : null}
+                    key={msg._id || idx}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.02 }}
-                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3`}
+                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}
                   >
                     <div
-                      className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${isOwn
-                          ? 'bg-blue-500 text-white rounded-br-none shadow-md'
-                          : 'bg-white text-gray-800 rounded-bl-none shadow-md border border-gray-100'
-                        }`}
+                      className={`max-w-[75%] sm:max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
+                        isOwn
+                          ? 'bg-gradient-to-br from-blue-400 to-blue-600 text-white rounded-br-none'
+                          : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
+                      }`}
                     >
                       <p className="text-sm sm:text-base whitespace-pre-wrap break-words leading-relaxed">
                         {msg.text}
                       </p>
 
-                      <div className={`flex items-center justify-end gap-1 mt-2 text-xs ${isOwn ? 'text-blue-100' : 'text-gray-400'
-                        }`}>
-                        <span>{formatMessageTime(msg.timestamp)}</span>
+                      <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${
+                        isOwn ? 'text-blue-100' : 'text-gray-400'
+                      }`}>
+                        <span>{formatMessageTime(msg.createdAt)}</span>
                         {isOwn && (
-                          <span title={msg.read ? "Read" : "Delivered"}>
+                          <span className="ml-1">
+                            {isRead ? <FaCheckDouble /> : <FaCheck />}
                           </span>
                         )}
                       </div>
@@ -280,9 +293,7 @@ const DoctorViewChat = () => {
               })}
             </div>
           ))}
-          
-          {/* Spacer div to ensure last message is visible above input */}
-          <div className="h-16" ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
@@ -296,9 +307,9 @@ const DoctorViewChat = () => {
             onClick={() => {
               scrollToBottom('smooth');
               setShowScrollButton(false);
-              setIsAtBottom(true);
+              isAtBottomRef.current = true;
             }}
-            className="absolute bottom-24 right-4 sm:right-6 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition z-30"
+            className="absolute bottom-24 right-4 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition z-30"
             aria-label="Scroll to bottom"
           >
             <FaArrowDown />
@@ -306,37 +317,42 @@ const DoctorViewChat = () => {
         )}
       </AnimatePresence>
 
-      {/* Input Area */}
-      <div
-        className="bg-white border-t border-blue-200 flex-shrink-0 sticky bottom-0 z-20"
-        style={{
-          position: "absolute",
-          width: "100%",
-          bottom: 0,
-        }}
-      >
-        <div className="max-w-3xl mx-auto p-3 sm:p-4">
-          <div className="flex gap-2 items-end">
+      {/* WhatsApp-style typing indicator */}
+      {isTyping && (
+        <div className="absolute bottom-20 left-4 bg-white rounded-full px-4 py-2 shadow-md border border-blue-200">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+              <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+              <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+            </div>
+            <span className="text-xs text-gray-500">Typing...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Fixed Input Area */}
+      <div className="bg-white border-t border-blue-200 flex-shrink-0 sticky bottom-0 z-20">
+        <div className="px-4 py-3">
+          <div className="flex gap-2 items-center">
             <div className="flex-1 relative">
               <textarea
                 rows="1"
                 placeholder="Type a message..."
-                className="w-full border border-gray-200 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 resize-none max-h-32 min-h-[52px] text-sm sm:text-base bg-gray-50 hover:bg-white transition"
+                className="w-full border border-gray-200 rounded-2xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 resize-none max-h-32 min-h-[40px] text-sm bg-gray-50 hover:bg-white transition"
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={handleTyping}
                 onKeyPress={handleKeyPress}
               />
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={handleSend}
               disabled={!newMessage.trim()}
-              className="bg-blue-500 text-white p-3 sm:p-4 rounded-full hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex-shrink-0"
+              className="bg-gradient-to-br from-blue-400 to-blue-600 text-white p-3 rounded-full hover:from-blue-500 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex-shrink-0"
               aria-label="Send message"
             >
-              <FaPaperPlane size={isMobile ? 16 : 18} />
-            </motion.button>
+              <FaPaperPlane size={18} />
+            </button>
           </div>
         </div>
       </div>

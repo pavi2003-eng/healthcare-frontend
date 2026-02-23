@@ -69,6 +69,36 @@ const DoctorDashboard = () => {
     mouseY.set(0);
   };
 
+  // Format date function
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return '';
+      
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays}d ago`;
+      
+      return date.toLocaleDateString([], { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+    } catch (error) {
+      return '';
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -120,6 +150,7 @@ const DoctorDashboard = () => {
 
         try {
           const chatsRes = await API.get(`/chats/doctor/${user.doctorId}`);
+          console.log('Chats data:', chatsRes.data); // Debug log
           setRecentChats(chatsRes.data.slice(0, 3));
         } catch (err) {
           console.error('Error fetching chats:', err);
@@ -144,8 +175,8 @@ const DoctorDashboard = () => {
           { name: 'Low', value: 11, color: '#10b981' },
         ]);
         setRecentChats([
-          { _id: '1', patientName: 'John Doe', messages: [{ text: 'When is my appointment?' }], lastUpdated: new Date() },
-          { _id: '2', patientName: 'Jane Smith', messages: [{ text: 'Thanks doctor!' }], lastUpdated: new Date() },
+          { _id: '1', patientName: 'John Doe', lastMessage: { text: 'When is my appointment?', createdAt: new Date() }, lastMessageAt: new Date() },
+          { _id: '2', patientName: 'Jane Smith', lastMessage: { text: 'Thanks doctor!', createdAt: new Date() }, lastMessageAt: new Date() },
         ]);
       } finally {
         setLoading(false);
@@ -367,7 +398,7 @@ const DoctorDashboard = () => {
             )}
           </motion.div>
 
-          {/* Recent Chats */}
+          {/* Recent Chats - FIXED DATE ISSUE */}
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -381,33 +412,40 @@ const DoctorDashboard = () => {
               <p className="text-gray-500 text-sm sm:text-base">No recent chats.</p>
             ) : (
               <div className="space-y-2 sm:space-y-3">
-                {recentChats.map(chat => (
-                  <Link
-                    key={chat._id}
-                    to={`/doctor/chats/${chat._id}`}
-                    className="block p-2 sm:p-3 border border-blue-100 rounded-lg hover:bg-blue-50 transition"
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-medium text-gray-800 text-sm sm:text-base truncate">
-                        {chat.patientName}
-                      </span>
-                      <span className="text-[10px] sm:text-xs text-gray-400">
-                        {new Date(chat.lastUpdated).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">
-                      {chat.messages?.[chat.messages.length - 1]?.text || 'No messages'}
-                    </p>
-                  </Link>
-                ))}
+                {recentChats.map(chat => {
+                  // Get the correct timestamp
+                  const timestamp = chat.lastMessage?.createdAt || chat.lastMessageAt || chat.createdAt;
+                  const lastMessageText = chat.lastMessage?.text || 'No messages yet';
+                  
+                  return (
+                    <Link
+                      key={chat._id}
+                      to={`/doctor/chats/${chat._id}`}
+                      className="block p-2 sm:p-3 border border-blue-100 rounded-lg hover:bg-blue-50 transition"
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-medium text-gray-800 text-sm sm:text-base truncate">
+                          {chat.patientName}
+                        </span>
+                        <span className="text-[10px] sm:text-xs text-gray-400">
+                          {formatDate(timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-gray-600 truncate">
+                        {lastMessageText}
+                      </p>
+                      {chat.unreadCount > 0 && (
+                        <span className="inline-block mt-1 bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          {chat.unreadCount} new
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </motion.div>
         </div>
-
-        <p className="text-[10px] sm:text-xs text-gray-400 mt-4 sm:mt-6 text-center">
-          Made with DrapCode
-        </p>
       </div>
     </div>
   );

@@ -384,7 +384,6 @@ const PatientDashboard = () => {
           </Link>
         </motion.div>
 
-        <p className="text-[10px] sm:text-xs text-gray-400 mt-4 sm:mt-6 text-center">Made with DrapCode</p>
       </div>
     </div>
   );

@@ -1,67 +1,36 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { 
-  FaHome, FaUserMd, FaCalendarAlt, FaComments, 
-  FaSignOutAlt, FaUserCircle, FaUsers,
-  FaTimes
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import {
+  FaHome,
+  FaUserMd,
+  FaCalendarAlt,
+  FaComments,
+  FaSignOutAlt,
+  FaUserCircle,
+  FaUsers
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
-import { motion, AnimatePresence } from 'framer-motion';
 
-const Sidebar = ({ isMobile, mobileMenuOpen, setMobileMenuOpen }) => {
+const Sidebar = ({ isMobile, sidebarOpen, setSidebarOpen }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  if (!user) return null;
 
   const handleLogout = () => {
-    if (isMobile) setMobileMenuOpen(false);
-    
     Swal.fire({
-      title: 'Are you sure?',
-      text: 'You will be logged out of the system.',
-      icon: 'question',
+      title: 'Logout?',
+      text: 'You will be logged out.',
+      icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, logout',
-      cancelButtonText: 'Cancel',
-      background: isMobile ? '#fff' : undefined,
-      width: isMobile ? '90%' : '32rem',
-      padding: isMobile ? '1rem' : '1.5rem',
-      position: 'center',
-      customClass: {
-        title: 'text-lg sm:text-xl font-bold text-gray-800',
-        htmlContainer: 'text-sm sm:text-base text-gray-600',
-        confirmButton: 'px-4 py-2 text-sm sm:text-base bg-blue-600 hover:bg-blue-700 rounded-lg font-medium',
-        cancelButton: 'px-4 py-2 text-sm sm:text-base bg-red-500 hover:bg-red-600 rounded-lg font-medium',
-        popup: 'rounded-xl shadow-2xl',
-      },
-      buttonsStyling: true,
-      reverseButtons: true,
-      allowOutsideClick: true,
-      allowEscapeKey: true,
-      allowEnterKey: true,
-      showLoaderOnConfirm: true,
-      preConfirm: async () => {
-        try {
-          await logout();
-          navigate('/login');
-        } catch (error) {
-          Swal.showValidationMessage('Logout failed. Please try again.');
-        }
-      },
-    }).then((result) => {
+      confirmButtonText: 'Logout',
+      confirmButtonColor: '#ef4444'
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        Swal.fire({
-          title: 'Logged out!',
-          text: 'You have been successfully logged out.',
-          icon: 'success',
-          timer: 2000,
-          showConfirmButton: false,
-          background: isMobile ? '#fff' : undefined,
-          width: isMobile ? '90%' : '32rem',
-          position: 'center',
-        });
+        await logout();
+        navigate('/login');
       }
     });
   };
@@ -71,116 +40,119 @@ const Sidebar = ({ isMobile, mobileMenuOpen, setMobileMenuOpen }) => {
       { to: 'dashboard', label: 'Dashboard', icon: <FaHome /> },
       { to: 'doctors', label: 'Doctors', icon: <FaUserMd /> },
       { to: 'patients', label: 'Patients', icon: <FaUsers /> },
-      { to: 'profile', label: 'My Profile', icon: <FaUserCircle /> },
+      { to: 'profile', label: 'My Profile', icon: <FaUserCircle /> }
     ],
     doctor: [
       { to: 'dashboard', label: 'Dashboard', icon: <FaHome /> },
-      { to: 'appointments', label: 'Appointments', icon: <FaCalendarAlt /> },
+      { to: 'appointments', label: 'Schedule', icon: <FaCalendarAlt /> }, // Changed label to "Schedule" to match image
       { to: 'chats', label: 'Chats', icon: <FaComments /> },
-      { to: 'profile', label: 'My Profile', icon: <FaUserCircle /> },
+      { to: 'profile', label: 'My Profile', icon: <FaUserCircle /> }
     ],
     patient: [
       { to: 'dashboard', label: 'Dashboard', icon: <FaHome /> },
       { to: 'doctors', label: 'Doctors', icon: <FaUserMd /> },
       { to: 'appointments', label: 'Appointments', icon: <FaCalendarAlt /> },
       { to: 'chats', label: 'Chats', icon: <FaComments /> },
-      { to: 'profile', label: 'My Profile', icon: <FaUserCircle /> },
-    ],
+      { to: 'profile', label: 'My Profile', icon: <FaUserCircle /> }
+    ]
   };
 
-  if (!user) return null;
-
-  const basePath = `/${user.role}`;
   const links = linkDefinitions[user.role] || [];
-  const portalTitle = user.role === 'admin' ? 'ADMIN PANEL' : user.role === 'doctor' ? 'DOCTOR PORTAL' : 'PATIENT PORTAL';
+  const basePath = `/${user.role}`;
+
+  // Helper function to check if current route matches the link
+  const isActiveLink = (to) => {
+    const fullPath = `${basePath}/${to}`;
+    const currentPath = location.pathname;
+    
+    // For appointments/schedule, check if the path starts with the full path
+    // This ensures it stays active on nested routes like /doctor/appointments/list or /doctor/appointments/123
+    if (to === 'appointments') {
+      return currentPath.startsWith(fullPath);
+    }
+    
+    // For dashboard, check exact match or if it's the root of the role
+    if (to === 'dashboard') {
+      return currentPath === fullPath || currentPath === basePath;
+    }
+    
+    return currentPath === fullPath;
+  };
 
   return (
-    <AnimatePresence mode="wait">
-      {(mobileMenuOpen || !isMobile) && (
-        <motion.div 
-          initial={{ x: isMobile ? -320 : -20, opacity: isMobile ? 0 : 0 }}
-          animate={{ 
-            x: 0, 
-            opacity: 1,
-            transition: { 
-              type: isMobile ? "spring" : "tween",
-              damping: 25,
-              stiffness: 200,
-              duration: isMobile ? undefined : 0.5
-            }
-          }}
-          exit={{ 
-            x: isMobile ? -320 : -20, 
-            opacity: isMobile ? 0 : 0,
-            transition: { duration: isMobile ? 0.2 : 0.3 }
-          }}
-          className={`sidebar-container fixed md:relative z-50 w-64 bg-white/95 md:bg-white/80 backdrop-blur-xl border-r border-white/30 shadow-2xl flex flex-col h-screen ${
-            isMobile ? 'left-0 top-0' : ''
-          }`}
-        >
-          {/* Header with close button on mobile */}
-          <div className="p-4 sm:p-5 font-bold text-lg sm:text-xl border-b border-white/30 text-blue-800 flex items-center justify-between">
-            <span className="truncate">{portalTitle}</span>
-            {isMobile && (
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Close menu"
-              >
-                <FaTimes size={18} className="text-gray-600" />
-              </button>
-            )}
+    <>
+      {/* Mobile Overlay */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div
+        className={`
+          ${isMobile ? 'fixed' : 'relative'}
+          ${sidebarOpen ? 'w-64' : 'w-0'}
+          transition-all duration-300
+          h-screen bg-white shadow-xl border-r z-50
+          overflow-hidden
+        `}
+      >
+        <div className="h-full flex flex-col">
+
+          {/* Header */}
+          <div className="p-4 border-b font-bold text-blue-700 text-lg">
+            {user.role.toUpperCase()} PANEL
           </div>
 
           {/* User Info */}
-          {user && (
-            <div className="p-3 sm:p-4 border-b border-white/30 bg-blue-50/30">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm sm:text-base">
-                  {user.name?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-xs sm:text-sm truncate">{user.name || 'User'}</p>
-                  <p className="text-[10px] sm:text-xs text-gray-500 truncate capitalize">{user.role}</p>
-                </div>
-              </div>
+          <div className="p-4 border-b flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+              {user.name?.charAt(0).toUpperCase()}
             </div>
-          )}
+            <div>
+              <p className="font-medium text-sm">{user.name}</p>
+              <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+            </div>
+          </div>
 
-          {/* Navigation Links */}
-          <nav className="flex-1 p-3 sm:p-4 space-y-0.5 sm:space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-300">
-            {links.map(link => (
-              <NavLink
-                key={link.to}
-                to={`${basePath}/${link.to}`}
-                onClick={() => isMobile && setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
-                    isActive 
-                      ? 'bg-blue-100/80 text-blue-700 shadow-md' 
-                      : 'text-gray-700 hover:bg-white/50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <span className="text-base sm:text-lg">{link.icon}</span>
-                <span className="font-medium text-sm sm:text-base truncate">{link.label}</span>
-              </NavLink>
-            ))}
+          {/* Navigation */}
+          <nav className="flex-1 p-3 space-y-2">
+            {links.map(link => {
+              const active = isActiveLink(link.to);
+              const fullPath = `${basePath}/${link.to}`;
+              
+              return (
+                <NavLink
+                  key={link.to}
+                  to={fullPath}
+                  onClick={() => isMobile && setSidebarOpen(false)}
+                  className={`flex items-center gap-3 p-3 rounded-lg transition ${
+                    active
+                      ? 'bg-blue-100 text-blue-700 font-medium'
+                      : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  <span className="text-lg">{link.icon}</span>
+                  <span>{link.label}</span>
+                </NavLink>
+              );
+            })}
           </nav>
 
-          {/* Logout Button */}
-          <div className="p-3 sm:p-4 border-t border-white/30">
-            <button 
-              onClick={handleLogout} 
-              className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 w-full text-left text-gray-700 hover:bg-red-50/80 hover:text-red-600 rounded-xl transition-all duration-200"
+          {/* Logout */}
+          <div className="p-4 border-t">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-red-600 hover:text-red-700 w-full p-2 rounded-lg hover:bg-red-50 transition"
             >
-              <FaSignOutAlt className="text-base sm:text-lg" />
-              <span className="font-medium text-sm sm:text-base">Logout</span>
+              <FaSignOutAlt />
+              Logout
             </button>
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 

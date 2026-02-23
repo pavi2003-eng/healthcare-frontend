@@ -362,8 +362,6 @@ const PatientDetail = () => {
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-xs text-gray-400 mt-4 sm:mt-6 text-center">Made with DrapCode</p>
       </div>
     </div>
   );

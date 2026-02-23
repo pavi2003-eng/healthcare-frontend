@@ -15,7 +15,6 @@ import {
   FaClinicMedical,
   FaPhone,
   FaTint,
-  FaWeight
 } from 'react-icons/fa';
 
 const ManagePatients = () => {
