@@ -4,25 +4,17 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout';
-
-// Public pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-
-// Admin pages
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import ManageDoctors from './pages/Admin/ManageDoctors';
 import ManagePatients from './pages/Admin/ManagePatients';
-
-// Doctor pages
 import DoctorDashboard from './pages/DoctorDashboard/DoctorDashboard';
 import AppointmentList from './pages/DoctorDashboard/AppointmentList';
 import PatientDetail from './pages/DoctorDashboard/PatientDetail';
 import DoctorChats from './pages/DoctorDashboard/Chats';
 import DoctorViewChat from './pages/DoctorDashboard/ViewChat';
 import BookAppointmentDoc from './pages/DoctorDashboard/BookAppointmentDoc';
-
-// Patient pages
 import PatientDashboard from './pages/PatientDashboard/PatientDashboard';
 import PatientDoctorList from './pages/PatientDashboard/DoctorList';
 import PatientBookAppointment from './pages/PatientDashboard/BookAppointment';
