@@ -23,8 +23,6 @@ import PatientChats from './pages/PatientDashboard/Chats';
 import PatientViewChat from './pages/PatientDashboard/ViewChat';
 import RateDoctor from './pages/PatientDashboard/RateDoctor';
 import UpdateAppointment from './pages/PatientDashboard/UpdateAppointment';
-
-// Profile page (common for all roles)
 import Profile from './pages/Profile';
 
 // Enhanced ScrollToTop component with multiple strategies
